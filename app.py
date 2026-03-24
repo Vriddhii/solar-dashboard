@@ -68,10 +68,10 @@ groupby, then built a full industrial AI pipeline.*
     )
 
 # ── File paths ────────────────────────────────────────────────────────────────
-PLANT1_GEN = "/Users/vriddhi/Desktop/Plant_1_Generation_Data.csv"
-PLANT2_GEN = "/Users/vriddhi/Desktop/Plant_2_Generation_Data.csv"
-PLANT1_WX  = "/Users/vriddhi/Desktop/Plant_1_Weather_Sensor_Data.csv"
-PLANT2_WX  = "/Users/vriddhi/Desktop/Plant_2_Weather_Sensor_Data.csv"
+PLANT1_GEN = "Plant_1_Generation_Data.csv"
+PLANT2_GEN = "Plant_2_Generation_Data.csv"
+PLANT1_WX  = "Plant_1_Weather_Sensor_Data.csv"
+PLANT2_WX  = "Plant_2_Weather_Sensor_Data.csv"
 
 
 # ── Data loading ──────────────────────────────────────────────────────────────
