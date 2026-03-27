@@ -431,13 +431,6 @@ with tab1:
         "Dips correspond to low-irradiation days (cloud cover or rain) "
         "rather than device faults."
     )
-    st.caption(
-        "No strong trend over 34 days — output oscillates between ~0.8M and ~1.3M. "
-        "Dips around May 20, May 29, June 1, and June 11-12 likely correspond to "
-        "low-irradiation weather days rather than device faults. No systematic degradation "
-        "suggests both plants are operating normally overall."
-    )
-
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown(
         "**Step 2 — EDA**\n\n"
@@ -666,7 +659,13 @@ with tab4:
             "this is a good day output-wise, but statistically anomalous because it was much better "
             "than the preceding days. Do NOT call this the worst day in your response. Instead frame "
             "it as 'the most statistically anomalous day' and explain the direction correctly based "
-            "on the z-score sign."
+            "on the z-score sign.\n\n"
+            "IMPORTANT: In this health scoring system, LOWER scores are BETTER. "
+            "A score of 0.0 means perfectly healthy, 1.0 means critically failing. "
+            "The fleet average of 0.311 means the fleet is mostly healthy. "
+            "Do NOT say the fleet is 'below average' or 'underperforming' based on this number. "
+            "Instead interpret it as: the fleet is in good overall health with a few inverters "
+            "requiring attention."
         )
         with st.spinner("Calling Groq (llama-3.1-8b-instant)..."):
             try:
