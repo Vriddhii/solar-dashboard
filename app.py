@@ -496,8 +496,7 @@ with tab2:
         "**Step 3 — Anomaly Detection**\n\n"
         "A rolling z-score was computed per inverter using a 3-day window with `.shift(1)` — "
         "each reading is compared against the *previous* window, not its own, to avoid data leakage. "
-        "Readings with absolute z-score > 2 are flagged as anomalies. This directly mirrors "
-        "Avathon's Normal Behavior Modeling approach."
+        "Readings with absolute z-score > 2 are flagged as anomalies."
     )
 
     total_anomaly_flags = int(anomalies_by_inverter["anomaly_count"].sum())
@@ -507,7 +506,7 @@ with tab2:
 
     a1, a2, a3, a4 = st.columns(4)
     a1.metric("Total Anomaly Flags",     total_anomaly_flags)
-    a2.metric("Worst Day",               worst_day)
+    a2.metric("Most Anomalous Day",               worst_day)
     a3.metric("Most Anomalous Inverter", most_anomalous_inv)
     a4.metric("Fleet Anomaly Rate",      f"{fleet_anomaly_rate:.2f}%")
     st.caption(
@@ -613,55 +612,18 @@ with tab3:
         st.success("No critical inverters detected. Fleet is healthy.")
     else:
         most_critical = critical_df.iloc[0]
-        crit_left, crit_right = st.columns([1, 2])
 
-        with crit_left:
-            st.markdown(
-                f'<p style="font-size:14px;font-weight:600;margin:0 0 12px 0;">'
-                f'Most Critical: <code>{most_critical["INVERTER_KEY"]}</code></p>',
-                unsafe_allow_html=True,
-            )
-            mc1, mc2 = st.columns(2)
-            mc1.metric("Anomaly Count",   int(most_critical["anomaly_count"]))
-            mc2.metric("Health Score",    f"{most_critical['health_score']:.3f}")
-            mc3, mc4 = st.columns(2)
-            mc3.metric("Avg % Deviation", f"{most_critical['avg_pct_deviation']:.2f}%")
-            mc4.metric("Worst Z-Score",   f"{most_critical['worst_z_score']:.2f}")
-
-        with crit_right:
-            critical_keys  = critical_df["INVERTER_KEY"].tolist()
-            critical_daily = daily_ac[daily_ac["INVERTER_KEY"].isin(critical_keys)].copy()
-            critical_daily["day_dt"] = pd.to_datetime(critical_daily["day"])
-            fleet_plot = fleet_avg.copy()
-            fleet_plot["day_dt"] = pd.to_datetime(fleet_plot["day"])
-
-            fig8, ax8 = plt.subplots(figsize=(9, 4), facecolor="white")
-            palette = plt.cm.Reds(np.linspace(0.4, 0.9, max(len(critical_keys), 1)))
-
-            for i, key in enumerate(critical_keys):
-                sub = critical_daily[critical_daily["INVERTER_KEY"] == key].sort_values("day_dt")
-                ax8.plot(sub["day_dt"], sub["total_ac_power"], label=key, color=palette[i], linewidth=1.2, alpha=0.85)
-
-            fleet_s = fleet_plot.sort_values("day_dt")
-            ax8.plot(
-                fleet_s["day_dt"], fleet_s["fleet_avg_power"],
-                label="Fleet Average", color="black", linewidth=2.5, linestyle="--",
-            )
-            style_ax(ax8, title="Critical Inverters vs Fleet Average", xlabel="Date", ylabel="Daily AC Power (kWh)")
-            plt.xticks(rotation=45, ha="right", fontsize=8)
-            ax8.legend(fontsize=7, bbox_to_anchor=(1.01, 1), loc="upper left")
-            fig8.tight_layout()
-            st.pyplot(fig8)
-            plt.close(fig8)
-            st.caption(
-                "Critical inverters plotted against fleet average. Sustained deviation below "
-                "the fleet line confirms chronic underperformance beyond weather effects."
-            )
-            st.caption(
-                "Critical inverters plotted against fleet average. Sustained deviation below the "
-                "fleet line confirms chronic underperformance beyond weather effects. Note that "
-                "rrq4fwE8jgrTyWY (highest health risk score) shows the most erratic behavior."
-            )
+        st.markdown(
+            f'<p style="font-size:14px;font-weight:600;margin:0 0 12px 0;">'
+            f'Most Critical: <code>{most_critical["INVERTER_KEY"]}</code></p>',
+            unsafe_allow_html=True,
+        )
+        mc1, mc2 = st.columns(2)
+        mc1.metric("Anomaly Count",   int(most_critical["anomaly_count"]))
+        mc2.metric("Health Score",    f"{most_critical['health_score']:.3f}")
+        mc3, mc4 = st.columns(2)
+        mc3.metric("Avg % Deviation", f"{most_critical['avg_pct_deviation']:.2f}%")
+        mc4.metric("Worst Z-Score",   f"{most_critical['worst_z_score']:.2f}")
 
 
 # ════════════════════════════════════════════════════════════════════════════
@@ -674,21 +636,37 @@ with tab4:
         '<h3 style="font-size:17px;font-weight:700;margin-bottom:4px;">Fleet Health Summary</h3>',
         unsafe_allow_html=True,
     )
+    worst_day_date       = pd.Timestamp(worst_day).date()
+    worst_day_mean_zscore = daily_ac[daily_ac["day"] == worst_day_date]["z_score"].mean()
+
     if st.button("Generate Fleet Health Summary", type="primary"):
         fleet_prompt = (
             "You are an industrial AI assistant for a solar power plant operator. "
-            "Given this fleet summary, provide a 4-5 sentence executive summary of overall "
-            "fleet health, highlight the worst day and explain whether it was likely a "
-            "weather event or device fault (if 30+ out of 44 inverters anomalied on the same "
-            "day it is likely weather), and identify the top concern for the operator.\n\n"
+            "Format your response in exactly 3 short paragraphs with these headers:\n"
+            "**Fleet Overview** — overall health summary in 2 sentences\n"
+            "**Most Anomalous Day Analysis** — classify June 13 as weather or fault based on the "
+            "z-score direction, explain why in 2 sentences\n"
+            "**Top Concern** — the single most urgent action for the operator in 1-2 sentences\n\n"
             "Fleet stats:\n"
             f"- Total inverters: {total_inverters}\n"
             f"- Critical inverters: {critical_count}\n"
             f"- Warning inverters: {warning_count}\n"
             f"- Healthy inverters: {healthy_count}\n"
-            f"- Worst day: {worst_day} with {worst_day_count} inverters flagged out of 44\n"
+            f"- Most anomalous day: {worst_day} with {worst_day_count} inverters flagged out of 44\n"
             f"- Fleet average health score: {fleet_avg_health:.3f}\n"
-            "- Date range: May 15 to June 17 2020"
+            f"- Most anomalous day mean z-score: {worst_day_mean_zscore:.2f}\n"
+            "- Date range: May 15 to June 17 2020\n\n"
+            "A positive mean z-score means output was unusually HIGH relative to recent history — "
+            "likely a sunny day after cloudy days, not a fault. "
+            "A negative mean z-score means output was unusually LOW — more likely a fault or "
+            "severe weather. Use this to correctly classify the event.\n\n"
+            "Important context: the 'most anomalous day' is defined as the day with the most "
+            "anomaly flags, not the day with the lowest output. If the mean z-score for that day "
+            "is positive (above +2), it means inverters were producing ABOVE their recent average — "
+            "this is a good day output-wise, but statistically anomalous because it was much better "
+            "than the preceding days. Do NOT call this the worst day in your response. Instead frame "
+            "it as 'the most statistically anomalous day' and explain the direction correctly based "
+            "on the z-score sign."
         )
         with st.spinner("Calling Groq (llama-3.1-8b-instant)..."):
             try:
@@ -716,31 +694,41 @@ with tab4:
         all_inv_ids  = list(critical_df["INVERTER_KEY"]) + list(warning_df["INVERTER_KEY"])
         selected_inv = st.selectbox("Select an inverter to view its recommendation:", all_inv_ids)
 
-        if st.button("Generate All Recommendations", type="primary"):
-            with st.spinner("Calling Groq for all Critical and Warning inverters..."):
+        is_critical = selected_inv in critical_df["INVERTER_KEY"].values
+        inv_row     = scorecard[scorecard["INVERTER_KEY"] == selected_inv].iloc[0]
+
+        if st.button("Generate Recommendation", type="primary"):
+            with st.spinner(f"Calling Groq for {selected_inv}..."):
                 try:
-                    crit_recs = get_groq_recommendations(critical_df) if len(critical_df) > 0 else {}
-                    warn_recs: dict[str, str] = {}
-                    for _, row in warning_df.iterrows():
-                        inv_id = row["INVERTER_KEY"]
-                        warn_prompt = (
+                    if is_critical:
+                        single_prompt = (
+                            "You are an industrial AI assistant for a solar plant operator. "
+                            "Given these Critical inverters with their anomaly count, avg deviation, "
+                            "worst z-score and health score, generate a 2-3 sentence plain English "
+                            "maintenance recommendation for each.\n\n"
+                            f"Inverter: {selected_inv}\n"
+                            f"- Anomaly Count: {int(inv_row['anomaly_count'])}\n"
+                            f"- Avg % Deviation from Fleet: {inv_row['avg_pct_deviation']:.2f}%\n"
+                            f"- Worst Z-Score: {inv_row['worst_z_score']:.2f}\n"
+                            f"- Health Score: {inv_row['health_score']:.3f}\n"
+                        )
+                    else:
+                        single_prompt = (
                             "You are an industrial AI assistant. This inverter is flagged as Warning — "
                             "monitor but not urgent. Given: "
-                            f"anomaly count {int(row['anomaly_count'])}, "
-                            f"avg deviation {row['avg_pct_deviation']:.2f}%, "
-                            f"worst z-score {row['worst_z_score']:.2f}, "
-                            f"health score {row['health_score']:.3f}. "
+                            f"anomaly count {int(inv_row['anomaly_count'])}, "
+                            f"avg deviation {inv_row['avg_pct_deviation']:.2f}%, "
+                            f"worst z-score {inv_row['worst_z_score']:.2f}, "
+                            f"health score {inv_row['health_score']:.3f}. "
                             "Provide a 2 sentence monitoring recommendation."
                         )
-                        warn_recs[inv_id] = get_single_groq_rec(warn_prompt)
-                    st.session_state["all_recommendations"] = {**crit_recs, **warn_recs}
+                    st.session_state[f"rec_{selected_inv}"] = get_single_groq_rec(single_prompt)
                 except Exception as e:
                     st.error(f"Groq API error: {e}")
 
-        if "all_recommendations" in st.session_state and selected_inv:
-            rec         = st.session_state["all_recommendations"].get(selected_inv, "_No recommendation generated._")
-            is_critical = selected_inv in critical_df["INVERTER_KEY"].values
-            box_style   = (
+        if f"rec_{selected_inv}" in st.session_state:
+            rec       = st.session_state[f"rec_{selected_inv}"]
+            box_style = (
                 "border-left:4px solid #DC2626;background:#fef2f2;padding:16px;border-radius:4px;color:#1a1a1a;"
                 if is_critical else
                 "border-left:4px solid #D97706;background:#fff7ed;padding:16px;border-radius:4px;color:#1a1a1a;"
